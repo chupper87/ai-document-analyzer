@@ -1,6 +1,7 @@
 from typing import Union
-
 from fastapi import FastAPI
+from config.database import engine
+from config.settings import settings
 
 
 app = FastAPI()
@@ -8,7 +9,18 @@ app = FastAPI()
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"message": "AI Document Analyzer API", "status": "running"}
+
+
+@app.get("/test-db")
+def test_db():
+    try:
+        # Test connection
+        connection = engine.connect()
+        connection.close()
+        return "Status: Database connected successfully"
+    except Exception as e:
+        return {"Status": "Database connection failed", "error": str(e)}
 
 
 @app.get("/items/{item_id}")
