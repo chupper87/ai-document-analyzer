@@ -2,7 +2,9 @@ from typing import Union
 from fastapi import FastAPI
 from config.database import engine, Base
 from config.settings import settings
-from models import user, document, category
+from models.user import User
+from models.category import Category
+from models.document import Document
 
 
 app = FastAPI()
@@ -25,8 +27,3 @@ def test_db():
         return "Status: Database connected successfully"
     except Exception as e:
         return {"Status": "Database connection failed", "error": str(e)}
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
