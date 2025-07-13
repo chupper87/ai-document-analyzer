@@ -1,10 +1,14 @@
 from typing import Union
 from fastapi import FastAPI
-from config.database import engine
+from config.database import engine, Base
 from config.settings import settings
+from models import user, document, category
 
 
 app = FastAPI()
+
+
+Base.metadata.create_all(bind=engine)  # Create all databases at start
 
 
 @app.get("/")
