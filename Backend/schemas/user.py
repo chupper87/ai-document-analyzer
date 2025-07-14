@@ -1,12 +1,11 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Optional
 import uuid
 
 
 class UserCreate(BaseModel):
     username: str
-    email: str
+    email: EmailStr
     password: str
 
 
@@ -16,6 +15,7 @@ class UserResponse(BaseModel):
     email: str
     is_active: bool
     created_at: datetime
+    updated_at: datetime
 
     class Config:
-        from_attributes = True  # Låter Pydantic läsa från SQLAlchemy objects
+        from_attributes = True

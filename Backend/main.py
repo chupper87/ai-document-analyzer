@@ -1,10 +1,9 @@
-from typing import Union
-from fastapi import FastAPI
-from config.database import engine, Base
-from config.settings import settings
+from fastapi import FastAPI, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from config.database import engine, Base, get_db
 from models.user import User
-from models.category import Category
-from models.document import Document
+from schemas.user import UserCreate, UserResponse
+from utils.auth import hash_password
 
 
 app = FastAPI()
@@ -27,3 +26,34 @@ def test_db():
         return "Status: Database connected successfully"
     except Exception as e:
         return {"Status": "Database connection failed", "error": str(e)}
+
+
+@app.post("/users/", response_model=UserResponse)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    """
+    Create a new user account.
+
+    - **username**: Username for the account
+    - **email**: Valid email address
+    - **password**: Password (will be hashed)
+    """
+
+    existing_user = db.query(User).filter(User.email == user.email).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
+        )
+
+    # Hash password
+    password_hash = hash_password(user.password)
+
+    # Create user
+    db_user = User(
+        username=user.username, email=user.email, password_hash=password_hash
+    )
+
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    return db_user
