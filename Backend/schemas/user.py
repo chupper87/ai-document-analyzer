@@ -19,3 +19,13 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    username: str | None = None
+    email: str | None = None
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
