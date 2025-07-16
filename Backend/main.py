@@ -8,6 +8,8 @@ from utils.auth import hash_password
 from fastapi.security import OAuth2PasswordRequestForm
 from schemas.token import Token
 from utils.auth import authenticate_user, create_access_token, get_current_user
+from schemas.category import CategoryCreate, CategoryResponse
+from models.category import Category
 
 
 @asynccontextmanager
@@ -140,3 +142,41 @@ def update_user_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@app.post("/categories/", response_model=CategoryResponse)
+def create_category(
+    category: CategoryCreate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new category for the current user.
+    """
+
+    existing_category = (
+        db.query(Category)
+        .filter(
+            Category.user_id == current_user.id,
+            Category.name == category.name,
+            Category.deleted_at.is_(None),
+        )
+        .first()
+    )
+
+    if existing_category:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Category with this name already exists",
+        )
+
+    # Create new category
+    db_category = Category(
+        user_id=current_user.id, name=category.name, color=category.color
+    )
+
+    db.add(db_category)
+    db.commit()
+    db.refresh(db_category)
+
+    return db_category
