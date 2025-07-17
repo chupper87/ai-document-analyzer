@@ -240,7 +240,7 @@ def read_categories(
 
 @app.put("/categories/{category_id}", response_model=CategoryResponse)
 def update_category(
-    category_id: UUID,  # Använd UUID istället för uuid.UUID
+    category_id: UUID,
     category_update: CategoryUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -295,7 +295,7 @@ def update_category(
 
 @app.delete("/categories/{category_id}")
 def delete_category(
-    category_id: UUID,  # Använd UUID istället för uuid.UUID
+    category_id: UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
