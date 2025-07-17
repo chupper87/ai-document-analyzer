@@ -335,15 +335,15 @@ def delete_category(
 
 async def save_file_to_disk(file: UploadFile, user_id: UUID) -> tuple[str, int]:
     """
-    Streamar en fil till disk i bitar (chunks) för att hantera stora filer
-    med låg minnesanvändning. Validerar även filstorleken under processen.
+    Streams a file to disk in chunks to handle large files
+    with low memory usage. Also validates file size during the process.
 
     Args:
-        file: Den inkommande filen (redan MIME-typ-validerad).
-        user_id: Användarens ID för att skapa en unik mappstruktur.
+        file: The incoming file (already MIME-type validated).
+        user_id: The user's ID to create a unique folder structure.
 
     Returns:
-        En tuple med (sökväg_till_fil, total_filstorlek_i_bytes).
+        A tuple containing (path_to_file, total_file_size_in_bytes).
     """
     file_id = uuid.uuid4()
     file_extension = Path(file.filename).suffix
@@ -363,7 +363,7 @@ async def save_file_to_disk(file: UploadFile, user_id: UUID) -> tuple[str, int]:
                     os.remove(file_path)
                     raise HTTPException(
                         status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        detail=f"Filen är för stor. Maxstorlek är {MAX_FILE_SIZE / 1024 / 1024:.0f} MB.",
+                        detail=f"File too large. Maximum size is {MAX_FILE_SIZE / 1024 / 1024:.0f} MB.",
                     )
                 await f.write(chunk)
     except Exception as e:
@@ -371,7 +371,7 @@ async def save_file_to_disk(file: UploadFile, user_id: UUID) -> tuple[str, int]:
             os.remove(file_path)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Kunde inte spara filen: {str(e)}",
+            detail=f"Could not save file: {str(e)}",
         )
 
     return str(file_path), total_bytes_written
@@ -385,11 +385,11 @@ async def upload_document(
     db: Session = Depends(get_db),
 ):
     """
-    Laddar upp ett dokument för analys.
-    Filen valideras för både typ och storlek innan den sparas.
+    Upload a document for analysis.
+    The file is validated for both type and size before saving.
     """
     if not file.filename:
-        raise HTTPException(status_code=400, detail="Filnamn saknas.")
+        raise HTTPException(status_code=400, detail="No filename provided.")
 
     validated_mime_type = await validate_file_type(file)
 
@@ -409,7 +409,7 @@ async def upload_document(
     db.commit()
     db.refresh(db_document)
 
-    # (Här skulle man kunna lägga till en bakgrundstask för AI-analys)
+    # (Here you could add a background task for AI analysis)
     # background_tasks.add_task(process_document, document_id=db_document.id)
 
     return db_document
