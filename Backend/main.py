@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 from uuid import UUID
 import uuid
+import os
 
 # Third-party imports
 from fastapi import FastAPI, Depends, HTTPException, status, File, UploadFile
@@ -21,6 +22,7 @@ from schemas.user import UserCreate, UserResponse, UserUpdate
 from schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
 from schemas.document import DocumentCreate, DocumentResponse
 from schemas.token import Token
+from utils.file_validator import validate_file_type
 from utils.auth import (
     hash_password,
     authenticate_user,
@@ -28,9 +30,13 @@ from utils.auth import (
     get_current_user,
 )
 
+
 # Configuration
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+MAX_FILE_SIZE = 15 * 1024 * 1024  # 15 MB
+CHUNK_SIZE = 1024 * 1024  # 1 MB
 
 
 # Application lifespan management
@@ -327,6 +333,50 @@ def delete_category(
 # =====================================================
 
 
+async def save_file_to_disk(file: UploadFile, user_id: UUID) -> tuple[str, int]:
+    """
+    Streamar en fil till disk i bitar (chunks) för att hantera stora filer
+    med låg minnesanvändning. Validerar även filstorleken under processen.
+
+    Args:
+        file: Den inkommande filen (redan MIME-typ-validerad).
+        user_id: Användarens ID för att skapa en unik mappstruktur.
+
+    Returns:
+        En tuple med (sökväg_till_fil, total_filstorlek_i_bytes).
+    """
+    file_id = uuid.uuid4()
+    file_extension = Path(file.filename).suffix
+    user_folder = UPLOAD_DIR / str(user_id)
+    user_folder.mkdir(parents=True, exist_ok=True)
+    file_path = user_folder / f"{file_id}{file_extension}"
+
+    total_bytes_written = 0
+    try:
+        async with aiofiles.open(file_path, "wb") as f:
+            while chunk := await file.read(CHUNK_SIZE):
+                # Validate size for every chunk
+                total_bytes_written += len(chunk)
+                if total_bytes_written > MAX_FILE_SIZE:
+                    # If file too big, abort and delete unfinished file
+                    await f.close()
+                    os.remove(file_path)
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"Filen är för stor. Maxstorlek är {MAX_FILE_SIZE / 1024 / 1024:.0f} MB.",
+                    )
+                await f.write(chunk)
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Kunde inte spara filen: {str(e)}",
+        )
+
+    return str(file_path), total_bytes_written
+
+
 @app.post("/documents/", response_model=DocumentResponse)
 async def upload_document(
     file: UploadFile = File(...),
@@ -335,46 +385,31 @@ async def upload_document(
     db: Session = Depends(get_db),
 ):
     """
-    Upload a document for analysis.
-
-    - **file**: The document file (PDF, DOCX, TXT)
-    - **category_id**: Optional category to assign the document to
+    Laddar upp ett dokument för analys.
+    Filen valideras för både typ och storlek innan den sparas.
     """
-    # Validate file
     if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided")
+        raise HTTPException(status_code=400, detail="Filnamn saknas.")
 
-    # Generate unique file ID and get extension
-    file_id = uuid.uuid4()
-    file_extension = Path(file.filename).suffix
+    validated_mime_type = await validate_file_type(file)
 
-    # Create user-specific folder structure
-    user_folder = UPLOAD_DIR / str(current_user.id)
-    user_folder.mkdir(exist_ok=True)
+    file_path, file_size = await save_file_to_disk(file=file, user_id=current_user.id)
 
-    file_path = user_folder / f"{file_id}{file_extension}"
-
-    # Save file asynchronously
-    try:
-        async with aiofiles.open(file_path, "wb") as f:
-            content = await file.read()
-            await f.write(content)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not save file: {str(e)}")
-
-    # Create database entry
     db_document = Document(
         user_id=current_user.id,
         category_id=category_id,
         original_filename=file.filename,
-        file_path=str(file_path),
-        file_size=len(content),
-        mime_type=file.content_type or "application/octet-stream",
+        file_path=file_path,
+        file_size=file_size,
+        mime_type=validated_mime_type,
         status="pending",
     )
 
     db.add(db_document)
     db.commit()
     db.refresh(db_document)
+
+    # (Här skulle man kunna lägga till en bakgrundstask för AI-analys)
+    # background_tasks.add_task(process_document, document_id=db_document.id)
 
     return db_document
