@@ -17,7 +17,6 @@ class Document(Base):
         UUID(as_uuid=True), ForeignKey("categories.id"), nullable=True, index=True
     )
 
-    # File metadata
     original_filename = Column(String(255), nullable=False)
     file_path = Column(Text, nullable=False)
     file_size = Column(Integer, nullable=False)
@@ -25,11 +24,9 @@ class Document(Base):
 
     # Preview and status
     preview_text = Column(Text, nullable=True)
-    status = Column(
-        String(20), default="pending", index=True
-    )  # pending/processing/completed/failed
+    status = Column(String(20), default="pending", index=True)
 
-    # Storage info för framtida cloud expansion
+    # Storage info for future cloud expansion
     storage_provider = Column(String(20), default="local")  # local/s3/azure
 
     # Timestamps
