@@ -20,7 +20,7 @@ from models.category import Category
 from models.document import Document
 from schemas.user import UserCreate, UserResponse, UserUpdate
 from schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
-from schemas.document import DocumentCreate, DocumentResponse, DocumentWithCategory
+from schemas.document import DocumentResponse, DocumentWithCategory
 from schemas.token import Token
 from utils.file_validator import validate_file_type
 from utils.auth import (
