@@ -1,15 +1,23 @@
 from fastapi import UploadFile, HTTPException, status
 from pathlib import Path
 import mimetypes
+import platform
 
-# Try to import magic, but handle if it fails
+# Try to import magic, but handle gracefully if it fails
 try:
-    import magic
+    if platform.system() != "Windows":
+        import magic
 
-    MAGIC_AVAILABLE = True
+        MAGIC_AVAILABLE = True
+    else:
+        # Explicitly disable on Windows due to segfault issues
+        MAGIC_AVAILABLE = False
+        print(
+            "ℹ️ Magic validation disabled on Windows - using signature validation instead"
+        )
 except ImportError:
     MAGIC_AVAILABLE = False
-    print("⚠️ python-magic could not be loaded. Using fallback validation.")
+    print("⚠️ python-magic not available - using fallback validation")
 
 # Define allowed MIME types for our application
 ALLOWED_MIME_TYPES = [

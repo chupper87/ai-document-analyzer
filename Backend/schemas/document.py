@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Any, Dict
 from uuid import UUID
 from datetime import datetime
 
@@ -19,6 +19,15 @@ class DocumentResponse(DocumentBase):
     mime_type: str
     status: str
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentWithCategory(DocumentResponse):
+    """Extended response that includes category information"""
+
+    category: Optional[Dict[str, Any]] = None
 
     class Config:
         from_attributes = True

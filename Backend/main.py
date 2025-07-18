@@ -20,7 +20,7 @@ from models.category import Category
 from models.document import Document
 from schemas.user import UserCreate, UserResponse, UserUpdate
 from schemas.category import CategoryCreate, CategoryResponse, CategoryUpdate
-from schemas.document import DocumentCreate, DocumentResponse
+from schemas.document import DocumentCreate, DocumentResponse, DocumentWithCategory
 from schemas.token import Token
 from utils.file_validator import validate_file_type
 from utils.auth import (
@@ -413,3 +413,51 @@ async def upload_document(
     # background_tasks.add_task(process_document, document_id=db_document.id)
 
     return db_document
+
+
+@app.get("/documents/", response_model=list[DocumentWithCategory])
+async def list_documents(
+    skip: int = 0,
+    limit: int = 100,
+    category_id: Optional[UUID] = None,
+    status: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    List all documents for the current user.
+
+    - **skip**: Number of documents to skip (for pagination)
+    - **limit**: Maximum number of documents to return
+    - **category_id**: Filter by specific category
+    - **status**: Filter by document status (pending/processing/completed/failed)
+    """
+    # Start with base query for user's documents
+    query = db.query(Document).filter(
+        Document.user_id == current_user.id, Document.deleted_at.is_(None)
+    )
+
+    # Apply optional filters
+    if category_id:
+        query = query.filter(Document.category_id == category_id)
+
+    if status:
+        query = query.filter(Document.status == status)
+
+    # Order by most recent first and apply pagination
+    documents = (
+        query.order_by(Document.created_at.desc()).offset(skip).limit(limit).all()
+    )
+
+    # Enrich with category information
+    for doc in documents:
+        if doc.category_id:
+            category = db.query(Category).filter(Category.id == doc.category_id).first()
+            if category:
+                doc.category = {
+                    "id": str(category.id),
+                    "name": category.name,
+                    "color": category.color,
+                }
+
+    return documents
